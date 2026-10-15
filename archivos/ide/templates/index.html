@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compiscript IDE</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">CS</span>
+      <div>
+        <h1>Compiscript IDE</h1>
+        <p>Analisis lexico, sintactico y semantico</p>
+      </div>
+    </div>
+    <div class="actions">
+      <label class="switch" title="Trata las advertencias como errores">
+        <input type="checkbox" id="strict"> modo estricto
+      </label>
+      <button id="load-example" class="btn ghost">Cargar ejemplo</button>
+      <button id="compile" class="btn primary">Compilar</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="editor-pane">
+      <div class="pane-header">
+        <h2>Editor</h2>
+        <span id="cursor-position" class="muted">Ln 1, Col 1</span>
+      </div>
+      <div class="editor-wrapper">
+        <pre id="gutter" class="gutter" aria-hidden="true"></pre>
+        <textarea id="editor" spellcheck="false" autocomplete="off"
+          placeholder="Escriba aqui su codigo Compiscript..."></textarea>
+      </div>
+    </section>
+
+    <section class="results-pane">
+      <div id="status" class="status idle">Sin compilar</div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="diagnostics" role="tab">
+          Diagnosticos <span id="diag-badge" class="badge">0</span>
+        </button>
+        <button class="tab" data-tab="ast" role="tab">AST</button>
+        <button class="tab" data-tab="symbols" role="tab">Tabla de simbolos</button>
+      </nav>
+
+      <div class="tab-panel active" id="panel-diagnostics">
+        <div id="diagnostics-list" class="diagnostics">
+          <p class="muted empty">Compile para ver errores y advertencias.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-ast">
+        <div class="panel-toolbar">
+          <button id="expand-all" class="btn tiny ghost">Expandir todo</button>
+          <button id="collapse-all" class="btn tiny ghost">Colapsar</button>
+        </div>
+        <div id="ast-tree" class="ast-tree">
+          <p class="muted empty">El AST aparecera aqui tras una compilacion.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-symbols">
+        <div id="symbols-table" class="symbols">
+          <p class="muted empty">La tabla de simbolos aparecera aqui tras una compilacion.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
