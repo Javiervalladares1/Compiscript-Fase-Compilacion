@@ -9,17 +9,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Optional, Sequence, TextIO
 
 from .ast.serializer import ast_to_json
 from .ast.visualizer import graphviz_available, render_image, write_dot
+from .backend.simulator import SimulatorError, run_spim
 from .pipeline import compile_file
 from .result import CompilationResult, CompileOptions
 from .semantic.diagnostics import Severity
 
-_DESCRIPTION = "Compilador de Compiscript: analisis lexico, sintactico y semantico."
+_DESCRIPTION = "Compilador de Compiscript: frontend, TAC y MIPS32 (SPIM/MARS)."
 
 #: Archivo DOT que se genera cuando se pasa ``--ast`` sin argumento.
 DEFAULT_AST_DOT = "ast.dot"
@@ -32,6 +34,13 @@ SYMBOLS_TO_STDOUT = "\0stdout"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="Driver.py", description=_DESCRIPTION)
     parser.add_argument("source", help="Archivo fuente .cps a analizar")
+    parser.add_argument("--tac", metavar="ARCHIVO.tac", help="Exporta codigo de tres direcciones")
+    parser.add_argument("--mips", metavar="ARCHIVO.asm", help="Exporta assembler MIPS32 para SPIM/MARS")
+    parser.add_argument("--allocation", choices=("registers", "stack"), default="registers",
+                        help="Asignacion con getReg o respaldo en pila en cada operacion")
+    parser.add_argument("--run", action="store_true", help="Genera MIPS y lo ejecuta en SPIM")
+    parser.add_argument("--run-timeout", type=float, default=10.0, metavar="SEGUNDOS",
+                        help="Limite de ejecucion SPIM (por omision: 10 segundos)")
     parser.add_argument(
         "--ast",
         nargs="?",
@@ -98,13 +107,23 @@ def main(argv: Optional[Sequence[str]] = None, stream: Optional[TextIO] = None) 
 
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.syntax_only and (args.tac or args.mips or args.run):
+        parser.error("--syntax-only no se puede combinar con --tac, --mips o --run")
+    if not math.isfinite(args.run_timeout) or args.run_timeout <= 0:
+        parser.error("--run-timeout debe ser finito y mayor que cero")
+    if args.run and args.diagnostics == "json":
+        parser.error("use --run y --diagnostics json en ejecuciones separadas")
 
     source_path = Path(args.source)
     if not source_path.is_file():
         print(f"error: no se encontro el archivo '{args.source}'", file=sys.stderr)
         return 2
 
-    options = CompileOptions(strict=args.strict, syntax_only=args.syntax_only)
+    options = CompileOptions(
+        strict=args.strict, syntax_only=args.syntax_only,
+        generate_tac=bool(args.tac), generate_mips=bool(args.mips or args.run),
+        allocation=args.allocation,
+    )
     result = compile_file(source_path, options)
 
     _write_outputs(result, args, out)
@@ -115,24 +134,44 @@ def main(argv: Optional[Sequence[str]] = None, stream: Optional[TextIO] = None) 
     else:
         _print_human(result, args, out)
 
+    if args.run and result.success and result.mips is not None:
+        try:
+            out.write(run_spim(result.mips, timeout=args.run_timeout))
+        except SimulatorError as error:
+            print(f"error de simulador: {error}", file=sys.stderr)
+            return 1
     return result.exit_code
 
 
 def _write_outputs(result: CompilationResult, args: argparse.Namespace, out: TextIO) -> None:
     """Genera los archivos solicitados aunque existan errores semanticos."""
+    def announce(message: str) -> None:
+        if args.diagnostics != "json":
+            out.write(message)
+
+    if result.success:
+        for destination, content, label in (
+            (args.tac, result.tac, "TAC"), (args.mips, result.mips, "MIPS")
+        ):
+            if destination and content is not None:
+                target = Path(destination)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content, encoding="utf-8")
+                if args.diagnostics != "json":
+                    out.write(f"{label} escrito en {target}\n")
     if result.ast is not None and args.ast:
         path = write_dot(result.ast, args.ast, graph_name=result.filename)
         if args.ast == DEFAULT_AST_DOT:
             # `--ast` sin argumento: ademas del DOT se muestra el arbol en la
             # consola, para poder inspeccionarlo sin abrir Graphviz.
-            out.write("\n" + result.ast.to_tree() + "\n")
-        out.write(f"AST (DOT) escrito en {path}\n")
+            announce("\n" + result.ast.to_tree() + "\n")
+        announce(f"AST (DOT) escrito en {path}\n")
 
     if result.ast is not None and args.ast_json:
         target = Path(args.ast_json)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(ast_to_json(result.ast), encoding="utf-8")
-        out.write(f"AST (JSON) escrito en {target}\n")
+        announce(f"AST (JSON) escrito en {target}\n")
 
     if result.ast is not None and args.ast_image:
         dot_path = Path(args.ast or Path(args.ast_image).with_suffix(".dot"))
@@ -145,23 +184,23 @@ def _write_outputs(result: CompilationResult, args: argparse.Namespace, out: Tex
                 if not graphviz_available()
                 else "el comando 'dot' fallo"
             )
-            out.write(f"Aviso: no se genero la imagen del AST ({reason}); el DOT si se genero.\n")
+            announce(f"Aviso: no se genero la imagen del AST ({reason}); el DOT si se genero.\n")
         else:
-            out.write(f"Imagen del AST escrita en {image}\n")
+            announce(f"Imagen del AST escrita en {image}\n")
 
     if result.symbol_table is not None and args.symbols == SYMBOLS_TO_STDOUT:
         # `--symbols` sin argumento: arbol de ambitos en la consola.
-        out.write("\n" + result.symbol_table.to_tree() + "\n\n")
+        announce("\n" + result.symbol_table.to_tree() + "\n\n")
     elif result.symbol_table is not None and args.symbols:
         target = Path(args.symbols)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(
             json.dumps(result.symbols_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        out.write(f"Tabla de simbolos escrita en {target}\n")
+        announce(f"Tabla de simbolos escrita en {target}\n")
 
     if result.symbol_table is not None and args.symbols_text:
-        out.write("\n" + result.symbol_table.to_text() + "\n\n")
+        announce("\n" + result.symbol_table.to_text() + "\n\n")
 
 
 def _print_human(result: CompilationResult, args: argparse.Namespace, out: TextIO) -> None:

@@ -1,4 +1,4 @@
-"""Frontend del compilador de Compiscript.
+"""Compilador de Compiscript: frontend y generacion TAC/MIPS opcional.
 
 Expone la API interna reutilizable por el CLI (``program/Driver.py``) y por el
 IDE (``ide/app.py``).

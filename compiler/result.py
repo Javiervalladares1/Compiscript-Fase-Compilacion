@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from .ast import nodes as N
 from .ast.serializer import ast_to_dict
+from .ir.model import IRProgram
 from .semantic.diagnostics import Diagnostic, Phase, Severity
 from .symbols.table import SymbolTable
 
@@ -19,11 +20,21 @@ class CompileOptions:
     strict: bool = False
     #: Omite el analisis semantico (solo lexico + sintactico).
     syntax_only: bool = False
+    #: Las fases nuevas son opt-in para conservar la API del frontend.
+    generate_tac: bool = False
+    generate_mips: bool = False
+    allocation: str = "registers"
+
+    def __post_init__(self) -> None:
+        if self.allocation not in ("registers", "stack"):
+            raise ValueError("allocation debe ser 'registers' o 'stack'")
+        if self.syntax_only and (self.generate_tac or self.generate_mips):
+            raise ValueError("syntax_only no se puede combinar con generacion TAC/MIPS")
 
 
 @dataclass
 class CompilationResult:
-    """Salida completa del frontend para un archivo fuente."""
+    """Salida del frontend y de las fases de generacion solicitadas."""
 
     filename: str
     source: str
@@ -31,6 +42,12 @@ class CompilationResult:
     ast: Optional[N.Program] = None
     symbol_table: Optional[SymbolTable] = None
     options: CompileOptions = field(default_factory=CompileOptions)
+    ir: Optional[IRProgram] = None
+    mips: Optional[str] = None
+
+    @property
+    def tac(self) -> Optional[str]:
+        return self.ir.to_text() if self.ir is not None else None
 
     # --- diagnosticos -----------------------------------------------------
 
@@ -97,4 +114,6 @@ class CompilationResult:
             "ast": self.ast_dict(),
             "symbolTable": self.symbols_dict(),
             "symbolRows": self.symbol_table.rows() if self.symbol_table is not None else [],
+            "tac": self.tac,
+            "mips": self.mips,
         }

@@ -30,3 +30,7 @@ configs
 
 # Segunda mitad del proyecto, conservada solo en esta computadora
 /pendiente/
+
+# Paquetes locales de la entrega en dos partes
+/pendiente.zip
+/out/

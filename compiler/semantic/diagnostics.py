@@ -28,6 +28,7 @@ class Phase(Enum):
     LEXICAL = "lexical"
     SYNTACTIC = "syntactic"
     SEMANTIC = "semantic"
+    CODEGEN = "codegen"
 
 
 class Code:
@@ -40,6 +41,9 @@ class Code:
     # --- Lexico / sintactico ---
     SYNTAX = "SYN001"
     LEXICAL = "SYN002"
+
+    # --- Codigo intermedio y backend ---
+    UNSUPPORTED_CODEGEN = "GEN001"
 
     # --- Declaraciones y ambitos ---
     UNDECLARED_IDENTIFIER = "SEM001"

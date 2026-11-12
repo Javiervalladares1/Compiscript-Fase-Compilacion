@@ -14,11 +14,13 @@ from typing import Optional
 from antlr4 import CommonTokenStream, InputStream
 
 from .ast.builder import build_ast
+from .backend import generate_mips
+from .ir import CodegenError, generate_ir
 from .parser.antlr_runtime import CompiscriptLexer, CompiscriptParser
 from .parser.error_listener import install_error_listeners
 from .result import CompilationResult, CompileOptions
 from .semantic.analyzer import SemanticAnalyzer
-from .semantic.diagnostics import DiagnosticBag
+from .semantic.diagnostics import Code, DiagnosticBag, Phase
 
 
 def compile_source(
@@ -26,10 +28,11 @@ def compile_source(
     filename: str = "<memory>",
     options: Optional[CompileOptions] = None,
 ) -> CompilationResult:
-    """Ejecuta el frontend completo sobre ``source``.
+    """Ejecuta el frontend y, opcionalmente, genera TAC y MIPS.
 
     Fases: analisis lexico, analisis sintactico, construccion del AST,
     construccion de la tabla de simbolos y analisis semantico.
+    Con generate_tac/generate_mips continua con las fases de generacion.
 
     Si el analisis sintactico produce errores no se ejecuta el analisis
     semantico, porque el arbol resultante no es confiable.
@@ -66,6 +69,16 @@ def compile_source(
 
     result.diagnostics = diagnostics.sorted()
     result.symbol_table = semantic.table
+    if result.success and (options.generate_tac or options.generate_mips):
+        try:
+            result.ir = generate_ir(program, semantic.table)
+            if options.generate_mips:
+                result.mips = generate_mips(result.ir, allocation=options.allocation)
+        except CodegenError as error:
+            diagnostics.report(
+                Code.UNSUPPORTED_CODEGEN, str(error), error.span, phase=Phase.CODEGEN
+            )
+            result.diagnostics = diagnostics.sorted()
     return result
 
 
