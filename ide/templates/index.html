@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Compiscript IDE</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">CS</span>
+      <div>
+        <h1>Compiscript IDE</h1>
+        <p>Proyecto 3 · Fuente → TAC → MIPS → SPIM</p>
+      </div>
+    </div>
+    <div class="actions">
+      <label class="select-label">Fase
+        <select id="phase">
+          <option value="mips">Generar MIPS</option>
+          <option value="frontend">Análisis semántico</option>
+        </select>
+      </label>
+      <label class="select-label">Asignación
+        <select id="allocation">
+          <option value="registers">Registros — getReg()</option>
+          <option value="stack">Pila</option>
+        </select>
+      </label>
+      <label class="switch" title="Trata las advertencias como errores">
+        <input type="checkbox" id="strict"> modo estricto
+      </label>
+      <button id="compile" class="btn primary">Compilar</button>
+      <button id="run" class="btn primary">Ejecutar en SPIM</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="editor-pane">
+      <div class="pane-header">
+        <h2>Editor</h2>
+        <div class="example-picker">
+          <label for="example">Ejemplo</label>
+          <select id="example">
+            <option value="factorial">Factorial recursivo</option>
+            <option value="llamadas">Llamadas y 6 parámetros</option>
+            <option value="control">Control y memoria</option>
+            <option value="closures">Variables capturadas</option>
+            <option value="clases">Clases y herencia</option>
+            <option value="excepciones">Errores y try/catch</option>
+            <option value="integral">Programa completo en MIPS</option>
+            <option value="frontend">Frontend original</option>
+          </select>
+          <button id="load-example" class="btn tiny ghost">Cargar ejemplo</button>
+        </div>
+        <span id="cursor-position" class="muted">Ln 1, Col 1</span>
+      </div>
+      <div class="editor-wrapper">
+        <pre id="gutter" class="gutter" aria-hidden="true"></pre>
+        <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="Código fuente Compiscript"
+          placeholder="Escriba aqui su codigo Compiscript..."></textarea>
+      </div>
+    </section>
+
+    <section class="results-pane">
+      <div id="status" class="status idle">Sin compilar</div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="diagnostics" role="tab">
+          Diagnosticos <span id="diag-badge" class="badge">0</span>
+        </button>
+        <button class="tab" data-tab="ast" role="tab">AST</button>
+        <button class="tab" data-tab="symbols" role="tab">Tabla de simbolos</button>
+        <button class="tab" data-tab="tac" role="tab">TAC</button>
+        <button class="tab" data-tab="mips" role="tab">MIPS</button>
+        <button class="tab" data-tab="execution" role="tab">Salida SPIM</button>
+      </nav>
+
+      <div class="tab-panel active" id="panel-diagnostics">
+        <div id="diagnostics-list" class="diagnostics">
+          <p class="muted empty">Compile para ver errores y advertencias.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-ast">
+        <div class="panel-toolbar">
+          <button id="expand-all" class="btn tiny ghost">Expandir todo</button>
+          <button id="collapse-all" class="btn tiny ghost">Colapsar</button>
+        </div>
+        <div id="ast-tree" class="ast-tree">
+          <p class="muted empty">El AST aparecera aqui tras una compilacion.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-symbols">
+        <div id="symbols-table" class="symbols">
+          <p class="muted empty">La tabla de simbolos aparecera aqui tras una compilacion.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-tac">
+        <div class="panel-toolbar">
+          <button id="download-tac" class="btn tiny ghost" disabled>Descargar .tac</button>
+        </div>
+        <pre class="code-output" id="tac-output">Compile en la fase MIPS para ver el código de tres direcciones.</pre>
+      </div>
+
+      <div class="tab-panel" id="panel-mips">
+        <div class="panel-toolbar">
+          <button id="download-mips" class="btn tiny ghost" disabled>Descargar .asm</button>
+        </div>
+        <pre class="code-output" id="mips-output">El assembler MIPS aparecerá aquí.</pre>
+      </div>
+
+      <div class="tab-panel" id="panel-execution">
+        <div class="panel-toolbar"><span class="muted">Simulador SPIM · límite de ejecución: 5 segundos</span></div>
+        <pre class="code-output" id="execution-output" aria-live="polite">Pulse «Ejecutar en SPIM» para correr el programa.</pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
